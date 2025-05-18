@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
+import 'package:student_hub/services/auth_service.dart';
 import 'package:student_hub/widgets/header_design.dart';
 import '../../core/app_export.dart';
 import '../../theme/custom_button_style.dart';
@@ -16,9 +17,9 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
-  final TextEditingController phoneController = TextEditingController();
-  final TextEditingController usernameController = TextEditingController();
+  final TextEditingController phoneController = TextEditingController();  // Comment or remove this line
   final TextEditingController passwordController = TextEditingController();
+  final TextEditingController usernameController = TextEditingController();
   final TextEditingController confirmPasswordController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
@@ -35,6 +36,38 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
+  // Remove this first _register method
+  // void _register() async {
+  //   if (_formKey.currentState?.validate() ?? false) {
+  //     setState(() {
+  //       _isLoading = true;
+  //     });
+  //
+  //     try {
+  //       final result = await AuthService.register({
+  //         'name': nameController.text.trim(),
+  //         'email': emailController.text.trim(),
+  //         // 'phone': phoneController.text.trim(),  // Remove this line
+  //         'password': passwordController.text.trim(),
+  //       });
+  //
+  //       if (result['success']) {
+  //         _showSnackBar("Registration successful!", Colors.green);
+  //         Navigator.pushReplacementNamed(context, AppRoutes.loginScreen);
+  //       } else {
+  //         _showSnackBar("Registration failed: ${result['message']}", Colors.red);
+  //       }
+  //     } catch (e) {
+  //       _showSnackBar("Error: ${e.toString()}", Colors.red);
+  //     } finally {
+  //       setState(() {
+  //         _isLoading = false;
+  //       });
+  //     }
+  //   }
+  // }
+
+  // Keep this second _register method
   Future<void> _register(BuildContext context) async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -49,7 +82,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         data: {
           'fullName': nameController.text.trim(),
           'email': emailController.text.trim(),
-          'phone': phoneController.text.trim(),
+          // 'phone': phoneController.text.trim(),  // Remove this line
           'username': usernameController.text.trim(),
           'password': passwordController.text,
           'confirmPassword': confirmPasswordController.text,
@@ -127,8 +160,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           const SizedBox(height: 20.0),
           _buildEmailInput(),
           const SizedBox(height: 20.0),
-          _buildPhoneInput(),
-          const SizedBox(height: 20.0),
+          // _buildPhoneInput(),  // Remove this line
+          // const SizedBox(height: 20.0),  // Remove this line if needed
           _buildUsernameInput(),
           const SizedBox(height: 20.0),
           _buildPasswordInput(),
@@ -172,21 +205,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Widget _buildPhoneInput() {
-    return CustomTextFormField(
-      controller: phoneController,
-      hintText: "Enter your phone number (e.g., +1234567890)",
-      textInputType: TextInputType.phone,
-      validator: (value) {
-        if (value == null || value.isEmpty) return "Phone number is required";
-        final phoneRegex = RegExp(r"^\+\d{10,15}$");
-        if (!phoneRegex.hasMatch(value)) return "Enter a valid phone number";
-        return null;
-      },
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 18.0, vertical: 14.0),
-    );
-  }
+  // Remove this entire method
+  // Widget _buildPhoneInput() {
+  //   return CustomTextFormField(
+  //     controller: phoneController,
+  //     hintText: "Enter your phone number (e.g., +1234567890)",
+  //     textInputType: TextInputType.phone,
+  //     validator: (value) {
+  //       if (value == null || value.isEmpty) return "Phone number is required";
+  //       final phoneRegex = RegExp(r"^\+\d{10,15}$");
+  //       if (!phoneRegex.hasMatch(value)) return "Enter a valid phone number";
+  //       return null;
+  //     },
+  //     contentPadding:
+  //         const EdgeInsets.symmetric(horizontal: 18.0, vertical: 14.0),
+  //   );
+  // }
 
   Widget _buildUsernameInput() {
     return CustomTextFormField(

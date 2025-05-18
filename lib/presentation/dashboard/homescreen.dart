@@ -11,6 +11,9 @@ import 'enrollment_schedules.dart';
 import 'notification_screen.dart';
 import 'self_enrollment_screen.dart';
 import 'complaint_screen.dart';
+import '../../models/user_model.dart';
+import '../../services/user_service.dart';
+
 void main() {
   runApp(MyApp());
 }
@@ -98,8 +101,34 @@ class HomeScreen extends StatefulWidget {
   _HomeScreenState createState() => _HomeScreenState();
 }
 
+// Update the _HomeScreenState class
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  UserModel? _userData;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserData();
+  }
+
+  Future<void> _fetchUserData() async {
+    setState(() => _isLoading = true);
+    try {
+      final userData = await UserService.getCurrentUser();
+      setState(() {
+        _userData = userData;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error fetching user data: $e');
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load profile data')),
+      );
+    }
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -121,110 +150,58 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // Update the build method to use _userData
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const CustomAppBar(title: 'UoG'),
-      drawer: const AppDrawer(),
+      appBar: const CustomAppBar(title: 'StudentHub'), // Only changed the title to 'StudentHub'
+      drawer: const AppDrawer(), // Kept as is
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Add the home icon with screen name
-              const ScreenHeader(screenName: "Profile"),
-              Container(
-                margin: const EdgeInsets.all(12),
-                child: Card(
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          "Academics",
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.teal,
-                              ),
-                        ),
-                        const SizedBox(height: 16),
-                        CircleAvatar(
-                          radius: 50,
-                          backgroundColor: Colors.grey[300],
-                          backgroundImage: const AssetImage('assets/images/prof_pic.jpg'),
-                          onBackgroundImageError: (exception, stackTrace) {
-                            print('Error loading profile image: $exception');
-                          },
-                          child: const Icon(Icons.person, size: 50, color: Colors.grey),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          "Mohammed Aitazaz Jamil",
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 10),
-                        Container(
-                          height: 200,
-                          child: SingleChildScrollView(
-                            child: Column(
-                              children: const [
-                                InfoItem(label: "Registration Number", value: "21011519-110"),
-                                InfoItem(label: "Faculty", value: "Faculty of Computing"),
-                                InfoItem(label: "Program Level", value: "Undergraduate"),
-                                InfoItem(label: "Program", value: "BS Computer Science"),
-                                InfoItem(label: "Current Semester", value: "8th Semester"),
-                                InfoItem(label: "CGPA", value: "3.75"),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8),
+        child: _isLoading
+            ? Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      "News and Announcements",
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.teal,
+                    const ScreenHeader(screenName: "Profile"),
+                    Container(
+                      margin: const EdgeInsets.all(12),
+                      child: _buildProfileCard(),  // Use the new method here
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "News and Announcements",
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.teal,
+                                ),
                           ),
-                    ),
-                    const Divider(color: Colors.teal),
-                    const AnnouncementItem(
-                      title: "Mid-term Exams Schedule",
-                      description: "Mid-term exams will start from 15th October. Check your portal for detailed schedule.",
-                      date: "2023-09-30",
-                    ),
-                    const AnnouncementItem(
-                      title: "Fee Submission Deadline",
-                      description: "Last date for fee submission is 10th October. Late fee will be charged afterwards.",
-                      date: "2023-09-28",
-                    ),
-                    const AnnouncementItem(
-                      title: "Career Fair 2023",
-                      description: "Annual career fair will be held on 20th October. Register now to participate.",
-                      date: "2023-09-25",
+                          const Divider(color: Colors.teal),
+                          const AnnouncementItem(
+                            title: "Mid-term Exams Schedule",
+                            description: "Mid-term exams will start from 15th October. Check your portal for detailed schedule.",
+                            date: "2023-09-30",
+                          ),
+                          const AnnouncementItem(
+                            title: "Fee Submission Deadline",
+                            description: "Last date for fee submission is 10th October. Late fee will be charged afterwards.",
+                            date: "2023-09-28",
+                          ),
+                          const AnnouncementItem(
+                            title: "Career Fair 2023",
+                            description: "Annual career fair will be held on 20th October. Register now to participate.",
+                            date: "2023-09-25",
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
-        ),
       ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
@@ -251,6 +228,105 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Settings',
           ),
         ],
+      ),
+    );
+  }
+
+  // Move this method inside the _HomeScreenState class
+  Widget _buildProfileCard() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center, // Center align all content
+          children: [
+            // Default profile picture centered
+            Container(
+              width: 100, // Larger size
+              height: 100,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.teal.shade700,
+                  width: 2,
+                ),
+                color: Colors.grey[200],
+              ),
+              child: const Icon(
+                Icons.person,
+                size: 60, // Larger icon
+                color: Colors.teal,
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Student name below the picture
+            Text(
+              _userData?.fullName ?? "Unknown Student",
+              style: TextStyle(
+                fontSize: 22, // Larger font
+                fontWeight: FontWeight.bold,
+                color: Colors.teal.shade800,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            // Email removed
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 8),
+            // Personal Information section - centered
+            Text(
+              "Personal Information",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.teal.shade700,
+              ),
+              textAlign: TextAlign.center, // Center the text
+            ),
+            const SizedBox(height: 12),
+            // Rest of the profile information
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  InfoItem(
+                    label: "Roll Number", 
+                    value: _userData?.rollNo ?? "Not available"
+                  ),
+                  InfoItem(
+                    label: "Department", 
+                    value: _userData?.department ?? "Not available"
+                  ),
+                  InfoItem(
+                    label: "Faculty", 
+                    value: _userData?.faculty ?? "Not available"
+                  ),
+                  InfoItem(
+                    label: "Program Level", 
+                    value: _userData?.programLevel ?? "Not available"
+                  ),
+                  InfoItem(
+                    label: "Program", 
+                    value: _userData?.program ?? "Not available"
+                  ),
+                  InfoItem(
+                    label: "Semester", 
+                    value: _userData?.semester ?? "Not available"
+                  ),
+                  InfoItem(
+                    label: "CGPA", 
+                    value: _userData?.cgpa ?? "Not available"
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

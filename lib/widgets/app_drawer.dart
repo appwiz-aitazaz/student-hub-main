@@ -3,10 +3,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:student_hub/core/app_export.dart';
 import 'package:student_hub/presentation/dashboard/challan.dart';
 import 'package:student_hub/presentation/dashboard/course_withdraw_screen.dart';
+import 'package:student_hub/presentation/dashboard/notification_screen.dart';
 import 'package:student_hub/presentation/dashboard/transcript_screen.dart';
+import '../models/user_model.dart';
 
 class AppDrawer extends StatelessWidget {
-  const AppDrawer({Key? key}) : super(key: key);
+  final UserModel? userData;
+  
+  const AppDrawer({Key? key, this.userData}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -21,23 +25,41 @@ class AppDrawer extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const CircleAvatar(
-                  radius: 30,
-                  backgroundImage: AssetImage('assets/images/prof_pic.jpg'),
+                // Default profile picture
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white,
+                      width: 2,
+                    ),
+                    color: Colors.grey[200],
+                  ),
+                  child: const Icon(
+                    Icons.person,
+                    size: 40,
+                    color: Colors.teal,
+                  ),
                 ),
                 const SizedBox(height: 10),
+                // Full name from database
                 Text(
-                  'Mohammed Aitazaz Jamil',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  userData?.fullName ?? 'Student',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
+                // Roll number from database
                 Text(
-                  '21011519-110',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Colors.white70,
-                      ),
+                  userData?.rollNo ?? 'No Roll Number',
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                  ),
                 ),
               ],
             ),
@@ -103,12 +125,7 @@ class AppDrawer extends StatelessWidget {
     );
   },
 ),
-              ListTile(
-                title: const Text("Transcript"),
-                onTap: () {
-                  Navigator.pushNamed(context, '/transcript');
-                },
-              ),
+              
             ],
           ),
           ListTile(
@@ -122,9 +139,14 @@ class AppDrawer extends StatelessWidget {
             leading: const Icon(Icons.notifications),
             title: const Text("Notifications"),
             onTap: () {
-              Navigator.pushNamed(context, '/notifications');
-            },
-          ),
+    Navigator.pop(context); // Close the drawer
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AllNotificationsScreen()),
+          );
+  },
+),
+            
           ListTile(
             leading: const Icon(Icons.report),
             title: const Text("Complaints"),

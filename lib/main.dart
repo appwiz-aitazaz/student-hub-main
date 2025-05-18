@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/app_export.dart';
+import 'services/auth_service.dart'; // Add this import
 
 var globalMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
@@ -10,19 +11,24 @@ Future<void> main() async {
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
   final prefs = await SharedPreferences.getInstance();
-  bool isProfileComplete = prefs.getBool('isProfileComplete') ?? false;
-  String? authToken = prefs.getString('auth_token');
+  // Set profile as complete to avoid redirection
+  await prefs.setBool('isProfileComplete', true);
+  // Set a dummy auth token if needed
+  if (prefs.getString('auth_token') == null) {
+    await prefs.setString('auth_token', 'dummy_token');
+  }
 
-  String initialRoute;
-  //initialRoute = AppRoutes.dashboard; // Default route
+  String initialRoute = AppRoutes.dashboard;
+  
+  // Determine initial route based on authentication status
   // if (authToken == null) {
-  initialRoute = AppRoutes.loginScreen;
+  //   initialRoute = AppRoutes.loginScreen;
   // } else if (!isProfileComplete) {
   //   initialRoute = AppRoutes.completeProfile;
   // } else {
-  //   initialRoute = AppRoutes.dashboard; // Add this route to `AppRoutes`
+  //   initialRoute = AppRoutes.dashboard;
   // }
-
+  
   runApp(MyApp(initialRoute: initialRoute));
 }
 

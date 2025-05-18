@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:student_hub/widgets/custom_text_form_field.dart';
+import 'package:student_hub/services/user_service.dart';
 import '../../core/app_export.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -10,8 +11,14 @@ class ForgotPasswordScreen extends StatefulWidget {
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+  final TextEditingController confirmPasswordController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
+  bool _emailSent = false;
+  String? _userId;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   void _showSnackBar(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -35,30 +42,78 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     return null;
   }
 
-  void _sendResetLink() async {
+  String? _validatePassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return "Password is required";
+    }
+    if (value.length < 6) {
+      return "Password must be at least 6 characters";
+    }
+    return null;
+  }
+
+  String? _validateConfirmPassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return "Please confirm your password";
+    }
+    if (value != passwordController.text) {
+      return "Passwords do not match";
+    }
+    return null;
+  }
+
+  void _findUser() async {
     if (_formKey.currentState?.validate() ?? false) {
       setState(() {
         _isLoading = true;
       });
 
       try {
-        final dio = Dio();
-        final response = await dio.post(
-          'https://studenthub-backend.fly.dev/api/v1/forgot-password',
-          data: {'email': emailController.text.trim()},
-        );
-
-        if (response.statusCode == 200) {
-          _showSnackBar(
-              "A reset link has been sent to your email", Colors.green);
-          Navigator.pushReplacementNamed(context, AppRoutes.loginScreen);
+        // Find user by email
+        final result = await UserService.findStudent(emailController.text.trim());
+        
+        if (result['success'] && result['data'] != null) {
+          setState(() {
+            _emailSent = true;
+            _userId = result['data']['_id']; // Store user ID for password reset
+          });
+          _showSnackBar("User found. Please set your new password.", Colors.green);
         } else {
-          _showSnackBar(
-              "Error: ${response.data['message'] ?? "Something went wrong"}",
-              Colors.red);
+          _showSnackBar("User not found with this email.", Colors.red);
         }
       } catch (e) {
-        _showSnackBar("Network Error. Please try again.", Colors.red);
+        _showSnackBar("Error: ${e.toString()}", Colors.red);
+      } finally {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _resetPassword() async {
+    if (_formKey.currentState?.validate() ?? false) {
+      setState(() {
+        _isLoading = true;
+      });
+
+      try {
+        if (_userId == null) {
+          _showSnackBar("User ID not found. Please try again.", Colors.red);
+          return;
+        }
+
+        // Reset password using the API
+        final result = await UserService.resetPassword(_userId!, passwordController.text);
+        
+        if (result['success']) {
+          _showSnackBar("Password reset successfully!", Colors.green);
+          Navigator.pushReplacementNamed(context, AppRoutes.loginScreen);
+        } else {
+          _showSnackBar("Error: ${result['message']}", Colors.red);
+        }
+      } catch (e) {
+        _showSnackBar("Error: ${e.toString()}", Colors.red);
       } finally {
         setState(() {
           _isLoading = false;
@@ -72,8 +127,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Forgot Password"),
-        backgroundColor: theme.primaryColor, // Use the app's primary color
-        foregroundColor: Colors.white, // Ensure the text is visible
+        backgroundColor: theme.primaryColor,
+        foregroundColor: Colors.white,
       ),
       body: Stack(
         children: [
@@ -89,33 +144,79 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          "Enter your registered email address to receive a password reset link.",
+                          _emailSent
+                              ? "Set your new password"
+                              : "Enter your registered email address to reset your password.",
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontSize: 12,
-                            color: Colors.black,
-                          ),
+                                fontSize: 14,
+                                color: Colors.black,
+                              ),
                         ),
                         const SizedBox(height: 20),
-                        CustomTextFormField(
-                          controller: emailController,
-                          hintText: "Enter your email",
-                          textInputType: TextInputType.emailAddress,
-                          validator: _validateEmail,
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 18, vertical: 14),
-                        ),
+                        if (!_emailSent) ...[
+                          CustomTextFormField(
+                            controller: emailController,
+                            hintText: "Enter your email",
+                            textInputType: TextInputType.emailAddress,
+                            validator: _validateEmail,
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 18, vertical: 14),
+                          ),
+                        ] else ...[
+                          CustomTextFormField(
+                            controller: passwordController,
+                            hintText: "Enter new password",
+                            textInputType: TextInputType.visiblePassword,
+                            obscureText: _obscurePassword,
+                            validator: _validatePassword,
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 18, vertical: 14),
+                            suffix: IconButton(
+                              icon: Icon(
+                                _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                                color: Colors.grey,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          CustomTextFormField(
+                            controller: confirmPasswordController,
+                            hintText: "Confirm new password",
+                            textInputType: TextInputType.visiblePassword,
+                            obscureText: _obscureConfirmPassword,
+                            validator: _validateConfirmPassword,
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 18, vertical: 14),
+                            suffix: IconButton(
+                              icon: Icon(
+                                _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                                color: Colors.grey,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscureConfirmPassword = !_obscureConfirmPassword;
+                                });
+                              },
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 20),
                         _isLoading
                             ? const Center(child: CircularProgressIndicator())
                             : ElevatedButton(
-                                onPressed: _isLoading ? null : _sendResetLink,
+                                onPressed: _isLoading ? null : (_emailSent ? _resetPassword : _findUser),
                                 style: ElevatedButton.styleFrom(
                                   minimumSize: const Size(double.infinity, 50),
                                   backgroundColor: theme.primaryColor,
-                                  foregroundColor: Colors.white, // Ensure text is visible
+                                  foregroundColor: Colors.white,
                                   textStyle: const TextStyle(fontSize: 16),
                                 ),
-                                child: const Text("Send Reset Link"),
+                                child: Text(_emailSent ? "Reset Password" : "Find Account"),
                               ),
                         const SizedBox(height: 20),
                         TextButton(
@@ -125,7 +226,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           },
                           child: const Text(
                             "Back to Login",
-                            style: TextStyle(color: Colors.black), // Black text for the button
+                            style: TextStyle(color: Colors.black),
                           ),
                         ),
                       ],

@@ -38,10 +38,10 @@ static const String enrollmentSchedules = '/enrollment_schedules';
 
 static const String complaintScreen = '/complaints';
 
+// Make sure your login route points to the presentation folder
 static Map<String, WidgetBuilder> routes = {
-
+  loginScreen: (context) =>  LoginScreen(), // Make sure this imports from presentation/login_screen/login_screen.dart
   registerScreen: (context) => RegisterScreen(),
- // loginScreen: (context) => LoginScreen(),
   appNavigationScreen: (context) => AppNavigationScreen(),
   initialRoute: (context) => OneScreen(),
   completeProfile: (context) => CompleteProfileScreen(),

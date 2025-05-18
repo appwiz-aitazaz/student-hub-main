@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:student_hub/presentation/dashboard/homescreen.dart';
+import 'package:student_hub/services/api_service.dart';
+import 'package:student_hub/services/auth_service.dart';
+import 'package:student_hub/services/user_service.dart';
 import 'package:student_hub/widgets/header_design.dart';
 import '../../core/app_export.dart';
 import '../../theme/custom_button_style.dart';
@@ -59,40 +62,34 @@ class _LoginScreenState extends State<LoginScreen> {
     return null;
   }
 
+  // Implement the login method using AuthService
   void _login(BuildContext context) async {
     if (_formKey.currentState?.validate() ?? false) {
       setState(() {
         _isLoading = true;
       });
 
-try {
-  final response = await dio.post(
-    'https://studenthub-backend.fly.dev/api/v1/student/login',
-    data: {
-      'email': emailController.text.trim(),
-      'password': passwordController.text.trim(),
-    },
-  );
+      try {
+        final result = await AuthService.login(
+          emailController.text.trim(),
+          passwordController.text.trim(),
+        );
 
-  if (response.statusCode == 200) {
-    _showSnackBar("Login Successful", Colors.green);
-
-    final token = response.data['token'];
-    if (token != null) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('auth_token', token);
-    }
-
-    await checkProfileCompletion(context);
-  } else {
-    final errorMsg = response.data['message'] ?? 'Invalid credentials';
-    _showSnackBar("Login Failed: $errorMsg", Colors.red);
-  }
-} on DioException catch (e) {
-  final errorMsg = e.response?.data['message'] ?? 'Network Error';
-  _showSnackBar("Login Failed: $errorMsg", Colors.red);
-} catch (e) {
-        _showSnackBar("Unexpected Error. Please try again.", Colors.red);
+        if (result['success']) {
+          _showSnackBar("Login Successful", Colors.green);
+          
+          // Get user data after successful login
+          final userId = await ApiService.getUserId();
+          if (userId != null) {
+            await AuthService.getUserById(userId);
+          }
+          
+          await checkProfileCompletion(context);
+        } else {
+          _showSnackBar("Login Failed: ${result['message']}", Colors.red);
+        }
+      } catch (e) {
+        _showSnackBar("Unexpected Error: ${e.toString()}", Colors.red);
       } finally {
         setState(() {
           _isLoading = false;
@@ -101,16 +98,46 @@ try {
     }
   }
 
-Future<void> checkProfileCompletion(BuildContext context) async {
-  SharedPreferences prefs = await SharedPreferences.getInstance();
-  bool isProfileComplete = prefs.getBool('isProfileComplete') ?? false;
-
-  if (isProfileComplete) {
-    Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
-  } else {
-    Navigator.pushReplacementNamed(context, AppRoutes.completeProfile);
+  Future<void> checkProfileCompletion(BuildContext context) async {
+    try {
+      // Fetch user data from backend
+      final userData = await UserService.getUserProfile();
+      
+      // Check if userData is a Map and has the expected structure
+      if (userData['success'] == true && userData['data'] != null) {
+        // Save user data locally
+        await UserService.saveUserMapToLocal(userData['data']);
+        
+        // Navigate based on profile completion status
+        final isProfileComplete = userData['data']['isProfileComplete'] ?? false;
+        
+        if (isProfileComplete) {
+          Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+        } else {
+          Navigator.pushReplacementNamed(context, AppRoutes.completeProfile);
+        }
+      } else {
+        // Fallback to local check
+        _checkLocalProfileCompletion(context);
+      }
+    } catch (e) {
+      print('Error checking profile completion: $e');
+      
+      // Fallback to local check if fails
+      _checkLocalProfileCompletion(context);
+    }
   }
-}
+  
+  Future<void> _checkLocalProfileCompletion(BuildContext context) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    bool isProfileComplete = prefs.getBool('isProfileComplete') ?? false;
+    
+    if (isProfileComplete) {
+      Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+    } else {
+      Navigator.pushReplacementNamed(context, AppRoutes.completeProfile);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -256,3 +283,4 @@ Future<void> checkProfileCompletion(BuildContext context) async {
     );
   }
 }
+
