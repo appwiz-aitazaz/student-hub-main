@@ -1,19 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:student_hub/core/app_export.dart';
 import 'package:student_hub/presentation/dashboard/challan.dart';
 import 'package:student_hub/presentation/dashboard/course_withdraw_screen.dart';
 import 'package:student_hub/presentation/dashboard/notification_screen.dart';
 import 'package:student_hub/presentation/dashboard/transcript_screen.dart';
-import '../models/user_model.dart';
+import 'package:student_hub/providers/user_provider.dart';
 
 class AppDrawer extends StatelessWidget {
-  final UserModel? userData;
-  
-  const AppDrawer({Key? key, this.userData}) : super(key: key);
+  const AppDrawer({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    // Get user data from provider or pass it as a parameter
+    final userData = Provider.of<UserProvider>(context).userData;
+    
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
@@ -31,11 +33,7 @@ class AppDrawer extends StatelessWidget {
                   height: 60,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white,
-                      width: 2,
-                    ),
-                    color: Colors.grey[200],
+                    color: Colors.white,
                   ),
                   child: const Icon(
                     Icons.person,
@@ -44,7 +42,7 @@ class AppDrawer extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 10),
-                // Full name from database
+                // User name from database
                 Text(
                   userData?.fullName ?? 'Student',
                   style: const TextStyle(
@@ -55,7 +53,7 @@ class AppDrawer extends StatelessWidget {
                 ),
                 // Roll number from database
                 Text(
-                  userData?.rollNo ?? 'No Roll Number',
+                  userData?.rollNo ?? 'Roll Number',
                   style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 14,
@@ -64,6 +62,7 @@ class AppDrawer extends StatelessWidget {
               ],
             ),
           ),
+          // Rest of drawer items remain the same
           ExpansionTile(
             leading: const Icon(Icons.school),
             title: const Text("Enrollment"),

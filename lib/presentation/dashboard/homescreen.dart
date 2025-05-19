@@ -154,8 +154,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const CustomAppBar(title: 'StudentHub'), // Only changed the title to 'StudentHub'
-      drawer: const AppDrawer(), // Kept as is
+      appBar: const CustomAppBar(title: 'StudentHub'),
+      drawer: const AppDrawer(),
       body: SafeArea(
         child: _isLoading
             ? Center(child: CircularProgressIndicator())
@@ -165,69 +165,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     const ScreenHeader(screenName: "Profile"),
                     Container(
-                      margin: const EdgeInsets.all(12),
-                      child: _buildProfileCard(),  // Use the new method here
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "News and Announcements",
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.teal,
-                                ),
-                          ),
-                          const Divider(color: Colors.teal),
-                          const AnnouncementItem(
-                            title: "Mid-term Exams Schedule",
-                            description: "Mid-term exams will start from 15th October. Check your portal for detailed schedule.",
-                            date: "2023-09-30",
-                          ),
-                          const AnnouncementItem(
-                            title: "Fee Submission Deadline",
-                            description: "Last date for fee submission is 10th October. Late fee will be charged afterwards.",
-                            date: "2023-09-28",
-                          ),
-                          const AnnouncementItem(
-                            title: "Career Fair 2023",
-                            description: "Annual career fair will be held on 20th October. Register now to participate.",
-                            date: "2023-09-25",
-                          ),
-                        ],
-                      ),
+                      margin: const EdgeInsets.all(16),
+                      child: _buildProfileCard(),
                     ),
                   ],
                 ),
               ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.teal,
-        selectedItemColor: Colors.white,
-        unselectedItemColor: Colors.white70,
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.notifications),
-            label: 'Notifications',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
-            label: 'Settings',
-          ),
-        ],
       ),
     );
   }
@@ -240,94 +183,116 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(15),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center, // Center align all content
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Default profile picture centered
+            // Default profile picture centered with increased size
             Container(
-              width: 100, // Larger size
-              height: 100,
+              width: 120, // Increased size
+              height: 120, // Increased size
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: Colors.teal.shade700,
-                  width: 2,
+                  width: 3, // Thicker border
                 ),
                 color: Colors.grey[200],
               ),
               child: const Icon(
                 Icons.person,
-                size: 60, // Larger icon
+                size: 70, // Larger icon
                 color: Colors.teal,
               ),
             ),
-            const SizedBox(height: 12),
-            // Student name below the picture
+            const SizedBox(height: 16),
+            // Student name below the picture with larger font
             Text(
               _userData?.fullName ?? "Unknown Student",
               style: TextStyle(
-                fontSize: 22, // Larger font
+                fontSize: 26, // Larger font
                 fontWeight: FontWeight.bold,
                 color: Colors.teal.shade800,
               ),
               textAlign: TextAlign.center,
             ),
-            // Email removed
+            const SizedBox(height: 24),
+            const Divider(thickness: 1.5),
             const SizedBox(height: 16),
-            const Divider(),
-            const SizedBox(height: 8),
-            // Personal Information section - centered
+            // Personal Information section - centered with larger font
             Text(
               "Personal Information",
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 22, // Larger font
                 fontWeight: FontWeight.bold,
                 color: Colors.teal.shade700,
               ),
-              textAlign: TextAlign.center, // Center the text
+              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 12),
-            // Rest of the profile information
-            Align(
-              alignment: Alignment.centerLeft,
+            const SizedBox(height: 20),
+            // Rest of the profile information with increased spacing and font size
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  InfoItem(
-                    label: "Roll Number", 
-                    value: _userData?.rollNo ?? "Not available"
-                  ),
-                  InfoItem(
-                    label: "Department", 
-                    value: _userData?.department ?? "Not available"
-                  ),
-                  InfoItem(
-                    label: "Faculty", 
-                    value: _userData?.faculty ?? "Not available"
-                  ),
-                  InfoItem(
-                    label: "Program Level", 
-                    value: _userData?.programLevel ?? "Not available"
-                  ),
-                  InfoItem(
-                    label: "Program", 
-                    value: _userData?.program ?? "Not available"
-                  ),
-                  InfoItem(
-                    label: "Semester", 
-                    value: _userData?.semester ?? "Not available"
-                  ),
-                  InfoItem(
-                    label: "CGPA", 
-                    value: _userData?.cgpa ?? "Not available"
-                  ),
+                  _buildInfoItem("Roll Number", _userData?.rollNo ?? "Not available"),
+                  const SizedBox(height: 12),
+                  _buildInfoItem("Department", _userData?.department ?? "Not available"),
+                  const SizedBox(height: 12),
+                  _buildInfoItem("Faculty", _userData?.faculty ?? "Not available"),
+                  const SizedBox(height: 12),
+                  _buildInfoItem("Program Level", _userData?.programLevel ?? "Not available"),
+                  const SizedBox(height: 12),
+                  _buildInfoItem("Program", _userData?.program ?? "Not available"),
+                  const SizedBox(height: 12),
+                  _buildInfoItem("Semester", _userData?.semester ?? "Not available"),
+                  const SizedBox(height: 12),
+                  _buildInfoItem("CGPA", _userData?.cgpa ?? "Not available"),
                 ],
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+  
+  // Custom info item with improved styling
+  Widget _buildInfoItem(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 2,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.teal.shade800,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        const Text(
+          ":",
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          flex: 3,
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontSize: 16,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

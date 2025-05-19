@@ -30,7 +30,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  shared_preferences: ^2.3.0
+  shared_preferences: ^2.2.0
+  provider: ^6.0.5  # Add this line
   connectivity_plus: ^6.1.3
   flutter_localizations:
     sdk: flutter

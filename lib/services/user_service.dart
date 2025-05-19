@@ -23,22 +23,41 @@ class UserService {
   }
 
   // Get current user profile
-  static Future<Map<String, dynamic>> getUserProfile() async {
+  // Update the getUserProfile method to accept a userId parameter
+  static Future<Map<String, dynamic>> getUserProfile(String userId) async {
     try {
-      final response = await ApiService.get('student/profile');
+      print('Attempting to fetch user profile for ID: $userId');
       
-      // Save user data to local storage
-      if (response['success'] && response['data'] != null) {
-        await saveUserMapToLocal(response['data']);
+      if (userId.isEmpty) {
+        return {
+          'success': false,
+          'message': 'Invalid user ID',
+          'data': <String, dynamic>{} // Return empty map instead of null
+        };
       }
       
-      return response;
+      final response = await ApiService.get('student/$userId');
+      
+      if (response == null) {
+        return {
+          'success': false,
+          'message': 'Failed to fetch user profile',
+          'data': <String, dynamic>{}
+        };
+      }
+      
+      return {
+        'success': true,
+        'message': 'User profile fetched successfully',
+        'data': response
+      };
     } catch (e) {
       print('Error fetching user profile: $e');
       return {
         'success': false,
         'message': 'Failed to fetch user profile',
-        'error': e.toString()
+        'error': e.toString(),
+        'data': <String, dynamic>{}
       };
     }
   }
@@ -203,4 +222,19 @@ class UserService {
     if (userData['semester'] != null) await prefs.setString('semester', userData['semester']);
     if (userData['department'] != null) await prefs.setString('department', userData['department']);
   }
-}
+  
+  // Add this method to your UserService class
+  // Update profile with user ID from token
+  static Future<Map<String, dynamic>> updateProfile(String userId, Map<String, dynamic> profileData) async {
+    try {
+      final response = await ApiService.put('student/update/$userId', profileData);
+      return response;
+    } catch (e) {
+      print('Error updating profile: $e');
+      return {
+        'success': false,
+        'message': 'Failed to update profile',
+        'error': e.toString()
+      };
+    }
+  }}

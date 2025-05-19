@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dio/dio.dart';
 
 class ApiService {
-  static const String baseUrl = 'https://e4a1-223-123-13-254.ngrok-free.app/api/v1';
+  static const String baseUrl = 'http://localhost:3000/api/v1';
 
   // Get auth token from SharedPreferences
   static Future<String?> _getToken() async {
@@ -28,13 +29,27 @@ class ApiService {
 
   // GET request
   static Future<dynamic> get(String endpoint) async {
-    final headers = await _getHeaders();
-    final response = await http.get(
-      Uri.parse('$baseUrl/$endpoint'),
-      headers: headers,
-    );
-    
-    return _processResponse(response);
+    try {
+      final dio = Dio();
+      final token = await _getToken();
+      
+      final options = Options(
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+      
+      final response = await dio.get(
+        '$baseUrl/$endpoint',
+        options: options,
+      );
+      
+      return response.data;
+    } catch (e) {
+      print('API GET Error: $e');
+      throw e;
+    }
   }
 
   // POST request

@@ -1,11 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shared_preferences/shared_preferences.dart';  // Keep this one
 import 'package:intl/intl.dart';
 import 'package:student_hub/routes/app_routes.dart';
-import 'package:student_hub/services/user_service.dart';
+import 'package:student_hub/services/user_service.dart';  // Keep this one
 import 'package:student_hub/core/app_export.dart';
 import 'package:student_hub/theme/custom_text_style.dart';
+import 'package:student_hub/services/semester_service.dart';
 
 class CompleteProfileScreen extends StatefulWidget {
   const CompleteProfileScreen({super.key});
@@ -28,11 +29,17 @@ class CompleteProfileScreenState extends State<CompleteProfileScreen> {
   String? _gender, _program, _semester, _domicile, _religion, _department, _faculty, _programLevel;
   bool _isLoading = false;
 
+  // Add semester-related variables
+  List<Map<String, dynamic>> _semestersFromApi = [];
+  bool _isLoadingSemesters = true;
+  String? _semesterError;
+
   // Dropdown options
   final List<String> _genders = ['Male', 'Female', 'Other'];
   final List<String> _programs = ['Computer Science', 'Software Engineering', 'Information Technology', 'Data Science', 'Artificial Intelligence', 'Other'];
   final List<String> _programLevels = ['BS', 'MS', 'PhD', 'Other'];
-  final List<String> _semesters = ['1', '2', '3', '4', '5', '6', '7', '8'];
+  // Change from final to non-final
+  List<String> _semesters = ['1', '2', '3', '4', '5', '6', '7', '8']; // We'll replace this with API data
   final List<String> _faculties = ['Faculty of Computing & IT', 'Faculty of Engineering', 'Faculty of Sciences', 'Faculty of Arts', 'Faculty of Business', 'Other'];
   final List<String> _domiciles = [
     'Punjab', 'Sindh', 'Khyber Pakhtunkhwa', 'Balochistan',
@@ -50,6 +57,49 @@ class CompleteProfileScreenState extends State<CompleteProfileScreen> {
   void initState() {
     super.initState();
     _loadSavedData();
+    
+    // Add this line to fetch semesters when screen loads
+    fetchSemesters();
+    
+    // For testing only - remove in production
+    _checkAndSetUserId();
+  }
+  
+  // Add method to fetch semesters
+  Future<void> fetchSemesters() async {
+    try {
+      setState(() {
+        _isLoadingSemesters = true;
+        _semesterError = null;
+      });
+      
+      print('Attempting to fetch semesters...');
+      final semestersList = await SemesterService.getAllSemesters();
+      print('API response received: $semestersList');
+      
+      setState(() {
+        _semestersFromApi = semestersList;
+        _isLoadingSemesters = false;
+        
+        // Update the semesters dropdown list with values from API
+        if (_semestersFromApi.isNotEmpty) {
+          _semesters = _semestersFromApi.map((semester) => 
+            semester['semester'] as String? ?? 'Unknown').toList();
+        }
+      });
+      
+      print('Fetched ${_semestersFromApi.length} semesters');
+      // Print each semester for debugging
+      _semestersFromApi.forEach((semester) {
+        print('Semester: ${semester['semester']}, ID: ${semester['_id']}');
+      });
+    } catch (e) {
+      print('Error fetching semesters: $e');
+      setState(() {
+        _isLoadingSemesters = false;
+        _semesterError = e.toString();
+      });
+    }
   }
 
   Future<void> _loadSavedData() async {
@@ -94,34 +144,53 @@ class CompleteProfileScreenState extends State<CompleteProfileScreen> {
       setState(() => _isLoading = true);
       
       try {
-        // Prepare profile data
-        final profileData = {
+        // Get the semester ID from the selected semester name
+        String? selectedSemesterId;
+        if (_semester != null) {
+          final selectedSemesterObj = _semestersFromApi.firstWhere(
+            (s) => s['semester'] == _semester,
+            orElse: () => <String, dynamic>{},
+          );
+          selectedSemesterId = selectedSemesterObj['_id'];
+        }
+        
+        // Create profile data map in the exact format required by the backend
+        final Map<String, dynamic> profileData = {
           'dob': _dobController.text,
+          'domicile': _domicile == 'Other' ? _customDomicileController.text : _domicile,
+          'semester': selectedSemesterId, // This is already the ID format
+          'program': _program,
+          'religion': _religion == 'Other' ? _customReligionController.text : _religion,
+          'nationality': _nationalityController.text,
           'gender': _gender,
           'cnic': _cnicController.text,
           'rollNo': _rollNoController.text,
-          'cgpa': _cgpaController.text,
-          'domicile': _domicile == 'Other' ? _customDomicileController.text : _domicile,
-          'nationality': _nationalityController.text,
-          'religion': _religion == 'Other' ? _customReligionController.text : _religion,
-          'program': _program,
-          'programLevel': _programLevel,
           'faculty': _faculty,
-          'semester': _semester,
-          'department': _department == 'Other' ? _customDepartmentController.text : _department,
-          'isProfileComplete': true,
-          'profileImage': 'default', // Set default profile image
+          'programLevel': _programLevel,
+          'cgpa': double.tryParse(_cgpaController.text) ?? 0.0
         };
         
-        // Log the data being sent (for debugging)
-        print('Sending profile data: $profileData');
+        // Log the data being sent for debugging
+        print('Sending profile data to backend: $profileData');
         
-        // Send data to backend
-        final response = await UserService.completeProfile(profileData);
+        // Get user ID from SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        final userId = prefs.getString('user_id');
         
-        if (response['success'] == true) {
+        if (userId == null) {
+          throw Exception('User ID not found. Please login again.');
+        }
+        
+        // Send data to backend using the update endpoint
+        final response = await UserService.updateProfile(userId, profileData);
+        print('Profile update response: $response'); // Debug print
+        
+        // Check if the response contains a success message
+        if (response['success'] == true || 
+            (response['message'] != null && 
+             response['message'].toString().contains('successfully'))) {
+          
           // Save profile completion status locally
-          final prefs = await SharedPreferences.getInstance();
           await prefs.setBool('isProfileComplete', true);
           
           // Save all profile data locally
@@ -130,7 +199,7 @@ class CompleteProfileScreenState extends State<CompleteProfileScreen> {
           // Show success message
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Profile completed successfully!'),
+              content: Text('Profile updated successfully!'),
               backgroundColor: Colors.green,
             ),
           );
@@ -138,40 +207,31 @@ class CompleteProfileScreenState extends State<CompleteProfileScreen> {
           // Navigate to dashboard
           Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
         } else {
-          // Show the actual error message from the server
-          final errorMessage = response['message'] ?? 'Failed to save profile. Please try again.';
-          final errorDetails = response['error'] != null ? '\n\nDetails: ${response['error']}' : '';
+          // Show detailed error message
+          final errorMessage = response['message'] ?? 'Failed to update profile';
+          final errorDetails = response['error'] != null ? '\nDetails: ${response['error']}' : '';
           
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Error: $errorMessage$errorDetails'),
               backgroundColor: Colors.red,
-              duration: const Duration(seconds: 10),
-              action: SnackBarAction(
-                label: 'DISMISS',
-                textColor: Colors.white,
-                onPressed: () {
-                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                },
-              ),
+              duration: const Duration(seconds: 5),
             ),
           );
           
-          // Log the full error response for debugging
-          print('Profile completion error: $response');
+          // Log the full error for debugging
+          print('Profile update error: $response');
         }
       } catch (e) {
-        // Show the actual exception message
-        String errorMessage = e.toString();
-        
+        // Show error message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $errorMessage'),
+            content: Text('Error: ${e.toString()}'),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 10),
+            duration: const Duration(seconds: 5),
           ),
         );
-        print('Exception in profile completion: $e');
+        print('Exception during profile update: $e');
       } finally {
         setState(() => _isLoading = false);
       }
@@ -549,6 +609,7 @@ class CompleteProfileScreenState extends State<CompleteProfileScreen> {
     );
   }
 
+  // Replace the existing _buildDropdown method or modify it to handle semester data
   Widget _buildDropdown({
     required String? value,
     required String labelText,
@@ -557,6 +618,45 @@ class CompleteProfileScreenState extends State<CompleteProfileScreen> {
     required void Function(String?) onChanged,
     required String? Function(String?)? validator,
   }) {
+    // If this is the semester dropdown and we're still loading
+    if (labelText == 'Semester' && _isLoadingSemesters) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            labelText,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.teal.shade800,
+            ),
+          ),
+          SizedBox(height: 8),
+          Center(child: CircularProgressIndicator()),
+        ],
+      );
+    }
+    
+    // If this is the semester dropdown and there was an error
+    if (labelText == 'Semester' && _semesterError != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            labelText,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.teal.shade800,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text('Error loading semesters: $_semesterError', 
+               style: TextStyle(color: Colors.red)),
+        ],
+      );
+    }
+
     return DropdownButtonFormField<String>(
       value: value,
       decoration: InputDecoration(
@@ -606,5 +706,18 @@ class CompleteProfileScreenState extends State<CompleteProfileScreen> {
     _rollNoController.dispose();
     _cgpaController.dispose();
     super.dispose();
+  }
+}
+
+// For debugging purposes only
+Future<void> _checkAndSetUserId() async {
+  final prefs = await SharedPreferences.getInstance();
+  final userId = prefs.getString('user_id');
+  print('Current user_id in SharedPreferences: $userId');
+  
+  if (userId == null) {
+    // For testing only - set a dummy user ID
+    // await prefs.setString('user_id', 'your-test-user-id');
+    print('Warning: No user_id found in SharedPreferences');
   }
 }

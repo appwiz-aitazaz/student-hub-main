@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/app_export.dart';
 import 'services/auth_service.dart'; // Add this import
+import 'package:provider/provider.dart';
+import 'providers/user_provider.dart';
 
 var globalMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
@@ -11,25 +13,37 @@ Future<void> main() async {
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
   final prefs = await SharedPreferences.getInstance();
-  // Set profile as complete to avoid redirection
-  await prefs.setBool('isProfileComplete', true);
-  // Set a dummy auth token if needed
-  if (prefs.getString('auth_token') == null) {
-    await prefs.setString('auth_token', 'dummy_token');
-  }
-
-  String initialRoute = AppRoutes.dashboard;
+  String initialRoute = AppRoutes.loginScreen;
+  
+  // Get auth token and profile completion status
+  final authToken = prefs.getString('auth_token');
+  final isProfileComplete = prefs.getBool('isProfileComplete') ?? false;
+  final isFirstLogin = prefs.getBool('is_first_login') ?? true;
   
   // Determine initial route based on authentication status
-  // if (authToken == null) {
-  //   initialRoute = AppRoutes.loginScreen;
-  // } else if (!isProfileComplete) {
-  //   initialRoute = AppRoutes.completeProfile;
-  // } else {
-  //   initialRoute = AppRoutes.dashboard;
-  // }
+  if (authToken != null) {
+    if (isFirstLogin || !isProfileComplete) {
+      // First time login or profile not completed - go to complete profile
+      initialRoute = AppRoutes.completeProfile;
+      // Set first login to false for next time
+      await prefs.setBool('is_first_login', false);
+    } else {
+      // Returning user with completed profile - go to dashboard
+      initialRoute = AppRoutes.dashboard;
+    }
+  } else {
+    // No auth token - go to login screen
+    initialRoute = AppRoutes.loginScreen;
+  }
   
-  runApp(MyApp(initialRoute: initialRoute));
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => UserProvider()),
+      ],
+      child: MyApp(initialRoute: initialRoute),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {

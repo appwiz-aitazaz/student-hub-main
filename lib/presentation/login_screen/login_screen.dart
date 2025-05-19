@@ -75,20 +75,33 @@ class _LoginScreenState extends State<LoginScreen> {
           passwordController.text.trim(),
         );
 
-        if (result['success']) {
+        print('Login response: $result'); // Debug log
+        
+        // Check if login was successful based on HTTP status code or message
+        if (result != null && 
+            (result['message'] == 'Student logged in successfully' || 
+             result['status'] == 200 ||
+             result['success'] == true)) {
+          
           _showSnackBar("Login Successful", Colors.green);
           
-          // Get user data after successful login
-          final userId = await ApiService.getUserId();
-          if (userId != null) {
-            await AuthService.getUserById(userId);
-          }
+          // Store login status in SharedPreferences
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('isLoggedIn', true);
           
+          // Remove the problematic call to getUserById
+          // Instead, directly check profile completion
           await checkProfileCompletion(context);
         } else {
-          _showSnackBar("Login Failed: ${result['message']}", Colors.red);
+          // Extract error message from response
+          final errorMessage = result != null 
+              ? (result['message'] ?? 'Unknown error') 
+              : 'Login failed';
+          
+          _showSnackBar("Login Failed: $errorMessage", Colors.red);
         }
       } catch (e) {
+        print('Login error: $e');
         _showSnackBar("Unexpected Error: ${e.toString()}", Colors.red);
       } finally {
         setState(() {
@@ -101,29 +114,40 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> checkProfileCompletion(BuildContext context) async {
     try {
       // Fetch user data from backend
-      final userData = await UserService.getUserProfile();
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id');
       
-      // Check if userData is a Map and has the expected structure
-      if (userData['success'] == true && userData['data'] != null) {
-        // Save user data locally
-        await UserService.saveUserMapToLocal(userData['data']);
+      print('Attempting to fetch profile with user ID: $userId');
+      
+      if (userId != null && userId.isNotEmpty) {
+        final userDataResponse = await UserService.getUserProfile(userId);
+        print('User profile API response: $userDataResponse'); // Debug log
         
-        // Navigate based on profile completion status
-        final isProfileComplete = userData['data']['isProfileComplete'] ?? false;
-        
-        if (isProfileComplete) {
-          Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+        // Check if the API response is valid
+        if (userDataResponse['success'] == true && userDataResponse['data'] != null) {
+          // Save user data locally
+          await UserService.saveUserMapToLocal(userDataResponse['data']);
+          
+          // Navigate based on profile completion status
+          final isProfileComplete = userDataResponse['data']['isProfileComplete'] ?? false;
+          
+          print('Profile complete status: $isProfileComplete'); // Debug log
+          
+          if (isProfileComplete) {
+            Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+          } else {
+            Navigator.pushReplacementNamed(context, AppRoutes.completeProfile);
+          }
         } else {
-          Navigator.pushReplacementNamed(context, AppRoutes.completeProfile);
+          print('Invalid user data response: $userDataResponse');
+          _checkLocalProfileCompletion(context);
         }
       } else {
-        // Fallback to local check
+        print('No user ID found in SharedPreferences after login');
         _checkLocalProfileCompletion(context);
       }
     } catch (e) {
       print('Error checking profile completion: $e');
-      
-      // Fallback to local check if fails
       _checkLocalProfileCompletion(context);
     }
   }

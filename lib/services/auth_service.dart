@@ -33,138 +33,76 @@ class AuthService {
         'password': password,
       });
       
+      print('Login response: $response'); // Debug print to see the full response
+      
+      // The issue is here - we need to handle the case where token is not in the response
+      // but _id is directly in the response
+      final prefs = await SharedPreferences.getInstance();
+      
+      // Check if _id exists in the response (directly at the top level)
+      if (response['_id'] != null) {
+        await prefs.setString('user_id', response['_id'].toString());
+        print('Saved user_id to SharedPreferences: ${response['_id']}');
+      } else {
+        print('Warning: No _id found in login response');
+      }
+      
+      // Store token if available
       if (response['token'] != null) {
-        final prefs = await SharedPreferences.getInstance();
         await prefs.setString('auth_token', response['token']);
-        await prefs.setString('user_id', response['_id']);
-
-        // Check if profile is complete
-        bool isProfileComplete = response['user'] != null && 
-                               response['user']['isProfileComplete'] == true;
-        await prefs.setBool('isProfileComplete', isProfileComplete);
-        
+      }
+      
+      // Check if profile is complete - this might need adjustment based on your response
+      bool isProfileComplete = false;
+      if (response['user'] != null && response['user']['isProfileComplete'] != null) {
+        isProfileComplete = response['user']['isProfileComplete'];
+      }
+      await prefs.setBool('isProfileComplete', isProfileComplete);
+      
+      return {
+        'success': response['message'] == 'Student logged in successfully',
+        'message': response['message'] ?? 'Login successful',
+        'data': response
+      };
+    } catch (e) {
+      print('Auth service login error: $e');
+      
+      // Check if the error has a response with a message
+      if (e is Exception && e.toString().contains('message')) {
+        final errorMsg = e.toString().split('message')[1].trim();
         return {
-          'success': true,
-          'message': response['message'] ?? 'Login successful',
-          'data': response
+          'success': false,
+          'message': errorMsg,
         };
       }
       
       return {
         'success': false,
-        'message': response['message'] ?? 'Login failed',
-      };
-    } catch (e) {
-      return {
-        'success': false,
         'message': e.toString(),
       };
     }
   }
-  // Get user ID from SharedPreferences
-  static Future<String?> getUserId() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('user_id');
-  }
-  // Get user data by ID
-  static Future<Map<String, dynamic>> getUserById(String id) async {
-     String? id = await getUserId();
+  
+  // Get user by ID
+  static Future<Map<String, dynamic>> getUserById(String userId) async {
     try {
-      final response = await ApiService.get('student/find/$id');
-      
-      if (response['success'] && response['data'] != null) {
-        // Save user data to local storage
-        final prefs = await SharedPreferences.getInstance();
-        final userData = response['data'];
-        
-        // Save basic user information
-        if (userData['_id'] != null) await prefs.setString('user_id', userData['_id']);
-        if (userData['name'] != null) await prefs.setString('name', userData['name']);
-        if (userData['email'] != null) await prefs.setString('email', userData['email']);
-        if (userData['phone'] != null) await prefs.setString('phone', userData['phone']);
-        
-        // Save profile information if available
-        if (userData['dob'] != null) await prefs.setString('dob', userData['dob']);
-        if (userData['gender'] != null) await prefs.setString('gender', userData['gender']);
-        if (userData['cnic'] != null) await prefs.setString('cnic', userData['cnic']);
-        if (userData['domicile'] != null) await prefs.setString('domicile', userData['domicile']);
-        if (userData['nationality'] != null) await prefs.setString('nationality', userData['nationality']);
-        if (userData['religion'] != null) await prefs.setString('religion', userData['religion']);
-        if (userData['program'] != null) await prefs.setString('program', userData['program']);
-        if (userData['semester'] != null) await prefs.setString('semester', userData['semester']);
-        if (userData['department'] != null) await prefs.setString('department', userData['department']);
-        if (userData['registrationNumber'] != null) await prefs.setString('registrationNumber', userData['registrationNumber']);
-        if (userData['faculty'] != null) await prefs.setString('faculty', userData['faculty']);
-        if (userData['programLevel'] != null) await prefs.setString('programLevel', userData['programLevel']);
-        if (userData['currentSemester'] != null) await prefs.setString('currentSemester', userData['currentSemester']);
-        if (userData['cgpa'] != null) await prefs.setString('cgpa', userData['cgpa'].toString());
-        
-        // Save profile completion status
-        await prefs.setBool('isProfileComplete', userData['isProfileComplete'] ?? false);
-      }
-      
-      return {
-        'success': response['success'] ?? false,
-        'message': response['message'] ?? 'User data retrieved',
-        'data': response['data']
-      };
-    } catch (e) {
-      return {
-        'success': false,
-        'message': e.toString(),
-      };
-    }
-  }
-
-  // Logout user
-  static Future<Map<String, dynamic>> logout() async {
-    try {
-      await ApiService.post('student/logout', {});
-      
-      // Clear local storage
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('auth_token');
-      await prefs.remove('isProfileComplete');
-      
+      final response = await ApiService.get('student/$userId');
       return {
         'success': true,
-        'message': 'Logout successful',
-      };
-    } catch (e) {
-      // Even if API call fails, clear local storage
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('auth_token');
-      await prefs.remove('isProfileComplete');
-      
-      return {
-        'success': false,
-        'message': e.toString(),
-      };
-    }
-  }
-
-  // Reset password
-  static Future<Map<String, dynamic>> resetPassword(String userId, String newPassword) async {
-    try {
-      final response = await ApiService.post('student/reset-password/$userId', {
-        'password': newPassword,
-      });
-      
-      return {
-        'success': true,
-        'message': response['message'] ?? 'Password reset successful',
+        'data': response
       };
     } catch (e) {
       return {
         'success': false,
-        'message': e.toString(),
+        'message': e.toString()
       };
     }
   }
-
-  // Check if user is authenticated
-  static Future<bool> isAuthenticated() async {
+  
+  // Temporary method to manually set user ID for testing
+  static Future<void> setTestUserId(String userId) async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('auth_token') != null;
+    await prefs.setString('user_id', userId);
+    print('Manually set test user_id: $userId');
   }
 }
