@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:student_hub/presentation/dashboard/transcript_screen.dart';
 import '../../widgets/announcement_item.dart';
 import '../../widgets/app_drawer.dart';
 import '../../widgets/custom_app_bar.dart';
@@ -71,9 +73,9 @@ class MyApp extends StatelessWidget {
           // case '/course_withdraw':
           //   page = CourseWithdrawScreen();
           //  break;
-          //case '/transcript':
-            //page = TranscriptScreen();
-           // break;
+          case '/transcript':
+            page = TranscriptScreen();
+            break;
           
           default:
             page = HomeScreen();
@@ -104,7 +106,7 @@ class HomeScreen extends StatefulWidget {
 // Update the _HomeScreenState class
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
-  UserModel? _userData;
+  Map<String, dynamic>? _userData;
   bool _isLoading = true;
 
   @override
@@ -116,11 +118,31 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _fetchUserData() async {
     setState(() => _isLoading = true);
     try {
-      final userData = await UserService.getCurrentUser();
-      setState(() {
-        _userData = userData;
-        _isLoading = false;
-      });
+      // Get user ID from SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id');
+      
+      if (userId != null && userId.isNotEmpty) {
+        // Fetch user data from API using the ID
+        final response = await UserService.getUserProfile(userId);
+        
+        if (response['success'] == true && response['data'] != null) {
+          setState(() {
+            _userData = response['data'];
+            _isLoading = false;
+          });
+          print('User data fetched successfully: $_userData');
+        } else {
+          print('Failed to fetch user data: ${response['message']}');
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to load profile data')),
+          );
+        }
+      } else {
+        print('No user ID found in SharedPreferences');
+        setState(() => _isLoading = false);
+      }
     } catch (e) {
       print('Error fetching user data: $e');
       setState(() => _isLoading = false);
@@ -155,7 +177,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: const CustomAppBar(title: 'StudentHub'),
-      drawer: const AppDrawer(),
+      drawer: AppDrawer(userData: _userData), // Pass userData to AppDrawer
       body: SafeArea(
         child: _isLoading
             ? Center(child: CircularProgressIndicator())
@@ -175,7 +197,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Move this method inside the _HomeScreenState class
+  // Update the _buildProfileCard method to use the new _userData structure
   Widget _buildProfileCard() {
     return Card(
       elevation: 4,
@@ -187,30 +209,54 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Default profile picture centered with increased size
             Container(
-              width: 120, // Increased size
-              height: 120, // Increased size
+              width: 120,
+              height: 120,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: Colors.teal.shade700,
-                  width: 3, // Thicker border
+                  width: 3,
                 ),
-                color: Colors.grey[200],
               ),
-              child: const Icon(
-                Icons.person,
-                size: 70, // Larger icon
-                color: Colors.teal,
+              child: ClipOval(
+                child: _userData?['picture'] != null
+                    ? Image.network(
+                        _userData!['picture'],
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          print('Error loading profile image: $error');
+                          return Icon(
+                            Icons.person,
+                            size: 70,
+                            color: Colors.teal,
+                          );
+                        },
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Center(
+                            child: CircularProgressIndicator(
+                              value: loadingProgress.expectedTotalBytes != null
+                                  ? loadingProgress.cumulativeBytesLoaded /
+                                      loadingProgress.expectedTotalBytes!
+                                  : null,
+                            ),
+                          );
+                        },
+                      )
+                    : Icon(
+                        Icons.person,
+                        size: 70,
+                        color: Colors.teal,
+                      ),
               ),
             ),
             const SizedBox(height: 16),
             // Student name below the picture with larger font
             Text(
-              _userData?.fullName ?? "Unknown Student",
+              _userData?['fullName'] ?? "Unknown Student",
               style: TextStyle(
-                fontSize: 26, // Larger font
+                fontSize: 26,
                 fontWeight: FontWeight.bold,
                 color: Colors.teal.shade800,
               ),
@@ -223,7 +269,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Text(
               "Personal Information",
               style: TextStyle(
-                fontSize: 22, // Larger font
+                fontSize: 22,
                 fontWeight: FontWeight.bold,
                 color: Colors.teal.shade700,
               ),
@@ -236,19 +282,31 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildInfoItem("Roll Number", _userData?.rollNo ?? "Not available"),
+                  _buildInfoItem("Roll Number", _userData?['rollNo'] ?? "Not available"),
                   const SizedBox(height: 12),
-                  _buildInfoItem("Department", _userData?.department ?? "Not available"),
+                  _buildInfoItem("Department", _userData?['program'] ?? "Not available"),
                   const SizedBox(height: 12),
-                  _buildInfoItem("Faculty", _userData?.faculty ?? "Not available"),
+                  _buildInfoItem("Faculty", _userData?['faculty'] ?? "Not available"),
                   const SizedBox(height: 12),
-                  _buildInfoItem("Program Level", _userData?.programLevel ?? "Not available"),
+                  _buildInfoItem("Program Level", _userData?['programLevel'] ?? "Not available"),
                   const SizedBox(height: 12),
-                  _buildInfoItem("Program", _userData?.program ?? "Not available"),
+                  _buildInfoItem("Program", _userData?['program'] ?? "Not available"),
                   const SizedBox(height: 12),
-                  _buildInfoItem("Semester", _userData?.semester ?? "Not available"),
+                  _buildInfoItem("Semester", _userData?['semester']?['semester'] ?? "Not available"),
                   const SizedBox(height: 12),
-                  _buildInfoItem("CGPA", _userData?.cgpa ?? "Not available"),
+                  _buildInfoItem("CGPA", _userData?['cgpa']?.toString() ?? "Not available"),
+                  const SizedBox(height: 12),
+                  _buildInfoItem("Gender", _userData?['gender'] ?? "Not available"),
+                  const SizedBox(height: 12),
+                  _buildInfoItem("Religion", _userData?['religion'] ?? "Not available"),
+                  const SizedBox(height: 12),
+                  _buildInfoItem("Nationality", _userData?['nationality'] ?? "Not available"),
+                  const SizedBox(height: 12),
+                  _buildInfoItem("CNIC", _userData?['cnic'] ?? "Not available"),
+                  const SizedBox(height: 12),
+                  _buildInfoItem("Domicile", _userData?['domicile'] ?? "Not available"),
+                  const SizedBox(height: 12),
+                  _buildInfoItem("Email", _userData?['email'] ?? "Not available"),
                 ],
               ),
             ),

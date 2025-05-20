@@ -7,62 +7,53 @@ import 'package:student_hub/presentation/dashboard/course_withdraw_screen.dart';
 import 'package:student_hub/presentation/dashboard/notification_screen.dart';
 import 'package:student_hub/presentation/dashboard/transcript_screen.dart';
 import 'package:student_hub/providers/user_provider.dart';
+import 'package:student_hub/services/auth_service.dart';
 
 class AppDrawer extends StatelessWidget {
-  const AppDrawer({Key? key}) : super(key: key);
+  final Map<String, dynamic>? userData;
+  
+  // Update constructor to accept userData
+  const AppDrawer({Key? key, this.userData}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    // Get user data from provider or pass it as a parameter
-    final userData = Provider.of<UserProvider>(context).userData;
+    // Get user name and roll number from userData or use defaults
+    final String userName = userData?['fullName'] ?? 'Student Name';
+    final String userRoll = userData?['rollNo'] ?? 'Roll Number';
     
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          DrawerHeader(
-            decoration: const BoxDecoration(
+          UserAccountsDrawerHeader(
+            accountName: Text(
+              userName,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: Colors.white, // Set text color to white
+              ),
+            ),
+            accountEmail: Text(
+              userRoll,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.white, // Set text color to white
+              ),
+            ),
+            currentAccountPicture: CircleAvatar(
+              backgroundColor: Colors.white,
+              child: Icon(
+                Icons.person,
+                size: 50,
+                color: Colors.teal,
+              ),
+            ),
+            decoration: BoxDecoration(
               color: Colors.teal,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Default profile picture
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white,
-                  ),
-                  child: const Icon(
-                    Icons.person,
-                    size: 40,
-                    color: Colors.teal,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                // User name from database
-                Text(
-                  userData?.fullName ?? 'Student',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                // Roll number from database
-                Text(
-                  userData?.rollNo ?? 'Roll Number',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
           ),
-          // Rest of drawer items remain the same
+          // Rest of your drawer items remain the same
           ExpansionTile(
             leading: const Icon(Icons.school),
             title: const Text("Enrollment"),
@@ -90,7 +81,7 @@ class AppDrawer extends StatelessWidget {
             ],
           ),
                         ListTile(
-              leading: Icon(Icons.receipt_long, color: Colors.teal.shade700),
+              leading: Icon(Icons.receipt_long, color: Colors.black), // Changed from teal.shade700 to black
               title: Text('Challan Management'),
               onTap: () {
               Navigator.pop(context); // Close the drawer
@@ -159,16 +150,57 @@ class AppDrawer extends StatelessWidget {
             leading: const Icon(Icons.logout),
             title: const Text("Logout"),
             onTap: () async {
-              // Clear user data from SharedPreferences
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.clear(); // This clears all stored preferences
-              
-              // Navigate to login screen and remove all previous routes
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                '/login',
-                (route) => false,
+              // Show loading indicator
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (BuildContext context) {
+                  return Center(
+                    child: CircularProgressIndicator(),
+                  );
+                },
               );
+              
+              try {
+                // Call logout API
+                final result = await AuthService.logout();
+                
+                // Close loading dialog
+                Navigator.pop(context);
+                
+                // Show success message
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(result['message']),
+                    backgroundColor: result['success'] ? Colors.green : Colors.red,
+                  ),
+                );
+                
+                // Navigate to login screen and remove all previous routes
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/login',
+                  (route) => false,
+                );
+              } catch (e) {
+                // Close loading dialog
+                Navigator.pop(context);
+                
+                // Show error message
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Logout failed: ${e.toString()}'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                
+                // Still navigate to login screen as fallback
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/login',
+                  (route) => false,
+                );
+              }
             },
           ),
         ],

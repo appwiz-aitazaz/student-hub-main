@@ -24,6 +24,7 @@ class UserService {
 
   // Get current user profile
   // Update the getUserProfile method to accept a userId parameter
+  // Update the getUserProfile method to use the correct endpoint
   static Future<Map<String, dynamic>> getUserProfile(String userId) async {
     try {
       print('Attempting to fetch user profile for ID: $userId');
@@ -36,7 +37,9 @@ class UserService {
         };
       }
       
-      final response = await ApiService.get('student/$userId');
+      // Update the endpoint to match your backend API structure
+      // Change from 'student/$userId' to 'student/user/$userId'
+      final response = await ApiService.get('student/user/$userId');
       
       if (response == null) {
         return {

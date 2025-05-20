@@ -105,4 +105,30 @@ class AuthService {
     await prefs.setString('user_id', userId);
     print('Manually set test user_id: $userId');
   }
+  
+  // Add this method to the AuthService class
+  static Future<Map<String, dynamic>> logout() async {
+    try {
+      final response = await ApiService.post('student/logout', {});
+      
+      // Clear local storage regardless of API response
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+      
+      return {
+        'success': true,
+        'message': 'Logged out successfully'
+      };
+    } catch (e) {
+      print('Logout error: $e');
+      // Still clear local storage even if API call fails
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+      
+      return {
+        'success': false,
+        'message': 'Error during logout, but local session cleared'
+      };
+    }
+  }
 }

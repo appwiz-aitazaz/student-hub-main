@@ -89,8 +89,7 @@ class _LoginScreenState extends State<LoginScreen> {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setBool('isLoggedIn', true);
           
-          // Remove the problematic call to getUserById
-          // Instead, directly check profile completion
+          // Check profile completion
           await checkProfileCompletion(context);
         } else {
           // Extract error message from response

@@ -1,8 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:student_hub/widgets/home_button.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/screen_header.dart';
 import '../../widgets/app_drawer.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../services/api_service.dart';
 
 class EnrolledCoursesScreen extends StatefulWidget {
   @override
@@ -10,52 +14,112 @@ class EnrolledCoursesScreen extends StatefulWidget {
 }
 
 class _EnrolledCoursesScreenState extends State<EnrolledCoursesScreen> {
-  final List<Map<String, dynamic>> _enrolledCourses = [
-    {
-      'name': 'Software Engineering',
-      'code': 'CS-301',
-      'credits': 3,
-      'type': 'Compulsory',
-      'instructor': 'Dr. Ahmed Khan',
-    },
-    {
-      'name': 'Database Systems',
-      'code': 'CS-302',
-      'credits': 4,
-      'type': 'Compulsory',
-      'instructor': 'Dr. Sarah Johnson',
-    },
-    {
-      'name': 'Artificial Intelligence',
-      'code': 'CS-401',
-      'credits': 3,
-      'type': 'Elective',
-      'instructor': 'Dr. Michael Brown',
-    },
-    {
-      'name': 'Computer Networks',
-      'code': 'CS-303',
-      'credits': 3,
-      'type': 'Compulsory',
-      'instructor': 'Dr. Fatima Ali',
-    },
-    {
-      'name': 'Mobile Application Development',
-      'code': 'CS-405',
-      'credits': 3,
-      'type': 'Elective',
-      'instructor': 'Dr. John Smith',
-    },
-  ];
-
+  List<Map<String, dynamic>> _enrolledCourses = [];
+  bool _isLoading = true;
+  String _errorMessage = '';
   String _searchQuery = '';
   String _filterType = 'All';
+  String _currentSemester = '';
+  int _totalCredits = 0;
+  int _compulsoryCourses = 0;
+  int _electiveCourses = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchEnrolledCourses();
+  }
+
+  Future<void> _fetchEnrolledCourses() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+
+    try {
+      // Get user ID from SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id');
+      
+      if (userId == null || userId.isEmpty) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'User ID not found. Please log in again.';
+        });
+        return;
+      }
+      
+      // Fetch courses from API
+      final response = await ApiService.get('course/getcourses/$userId');
+      
+      if (response != null && response is List) {
+        // Convert API response to list of maps
+        final courses = List<Map<String, dynamic>>.from(response);
+        
+        // Calculate statistics
+        int totalCredits = 0;
+        int compulsory = 0;
+        int elective = 0;
+        
+        // Process courses
+        for (var course in courses) {
+          // Add credit hours
+          totalCredits += (course['creditHours'] ?? 0) as int;
+          
+          // Determine course type based on course code
+          if ((course['courseCode'] ?? '').toString().startsWith('ELEC')) {
+            elective++;
+          } else {
+            compulsory++;
+          }
+        }
+        
+        // Get current semester from user data if available
+        final userData = prefs.getString('userData');
+        String semesterName = 'Current Semester';
+        if (userData != null) {
+          final userDataMap = json.decode(userData);
+          semesterName = userDataMap['semester']?['semester'] ?? 'Current Semester';
+        }
+        
+        setState(() {
+          _enrolledCourses = courses;
+          _isLoading = false;
+          _totalCredits = totalCredits;
+          _compulsoryCourses = compulsory;
+          _electiveCourses = elective;
+          _currentSemester = semesterName;
+        });
+      } else {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'No courses found for your semester';
+          _enrolledCourses = [];
+        });
+      }
+    } catch (e) {
+      print('Error fetching enrolled courses: $e');
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Failed to load courses: ${e.toString()}';
+        _enrolledCourses = [];
+      });
+    }
+  }
 
   List<Map<String, dynamic>> get _filteredCourses {
     return _enrolledCourses.where((course) {
-      final nameMatches = course['name'].toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          course['code'].toLowerCase().contains(_searchQuery.toLowerCase());
-      final typeMatches = _filterType == 'All' || course['type'] == _filterType;
+      // Update field names to match backend response
+      final nameMatches = 
+          (course['courseName'] ?? '').toString().toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          (course['courseCode'] ?? '').toString().toLowerCase().contains(_searchQuery.toLowerCase());
+      
+      // Determine course type based on course code since backend doesn't provide type
+      final isElective = (course['courseCode'] ?? '').toString().startsWith('ELEC');
+      final courseType = isElective ? 'Elective' : 'Compulsory';
+      
+      final typeMatches = _filterType == 'All' || courseType == _filterType;
+      
       return nameMatches && typeMatches;
     }).toList();
   }
@@ -252,28 +316,35 @@ class _EnrolledCoursesScreenState extends State<EnrolledCoursesScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          // Make the semester title responsive
+          Wrap(
+            alignment: WrapAlignment.start,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Icon(Icons.calendar_today, color: Colors.white.withOpacity(0.9), size: 20),
               const SizedBox(width: 8),
-              const Text(
-                'Current Semester: Fall 2023',
-                style: TextStyle(
+              Text(
+                'Current Semester: $_currentSemester',
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
           const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // Make the info items row responsive
+          Wrap(
+            spacing: 8.0,
+            runSpacing: 8.0,
+            alignment: WrapAlignment.spaceBetween,
             children: [
-              _buildInfoItem('Total Courses', '5'),
-              _buildInfoItem('Total Credits', '16'),
-              _buildInfoItem('Compulsory', '3'),
-              _buildInfoItem('Elective', '2'),
+              _buildInfoItem('Total Courses', _enrolledCourses.length.toString()),
+              _buildInfoItem('Total Credits', _totalCredits.toString()),
+              _buildInfoItem('Compulsory', _compulsoryCourses.toString()),
+              _buildInfoItem('Elective', _electiveCourses.toString()),
             ],
           ),
         ],
@@ -281,14 +352,20 @@ class _EnrolledCoursesScreenState extends State<EnrolledCoursesScreen> {
     );
   }
 
+  // Update the info item to be responsive
   Widget _buildInfoItem(String label, String value) {
     return Container(
+      width: MediaQuery.of(context).size.width < 400 ? 
+          (MediaQuery.of(context).size.width - 64) / 2 : // For very small screens, 2 items per row
+          null, // Let it take natural width on larger screens
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      margin: const EdgeInsets.only(bottom: 4),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.2),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Text(
             value,
@@ -305,6 +382,7 @@ class _EnrolledCoursesScreenState extends State<EnrolledCoursesScreen> {
               fontSize: 12,
               color: Colors.white.withOpacity(0.9),
             ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
@@ -312,6 +390,10 @@ class _EnrolledCoursesScreenState extends State<EnrolledCoursesScreen> {
   }
 
   Widget _buildCourseCard(Map<String, dynamic> course) {
+    // Determine course type based on course code
+    final isElective = (course['courseCode'] ?? '').toString().startsWith('ELEC');
+    final courseType = isElective ? 'Elective' : 'Compulsory';
+    
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 3,
@@ -324,7 +406,11 @@ class _EnrolledCoursesScreenState extends State<EnrolledCoursesScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            // Make the top row responsive
+            Wrap(
+              spacing: 12.0,
+              runSpacing: 12.0,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Container(
                   padding: const EdgeInsets.all(10),
@@ -338,22 +424,23 @@ class _EnrolledCoursesScreenState extends State<EnrolledCoursesScreen> {
                     size: 24,
                   ),
                 ),
-                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        course['name'],
+                        course['courseName'] ?? 'Unknown Course',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                           color: Colors.black87,
                         ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 2,
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        course['code'],
+                        course['courseCode'] ?? 'No Code',
                         style: TextStyle(
                           fontWeight: FontWeight.w500,
                           color: Colors.grey.shade700,
@@ -365,13 +452,11 @@ class _EnrolledCoursesScreenState extends State<EnrolledCoursesScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: course['type'] == 'Compulsory' 
-                        ? Colors.teal.shade700 
-                        : Colors.amber.shade700,
+                    color: isElective ? Colors.amber.shade700 : Colors.teal.shade700,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    course['type'],
+                    courseType,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 12,
@@ -382,15 +467,19 @@ class _EnrolledCoursesScreenState extends State<EnrolledCoursesScreen> {
               ],
             ),
             const Divider(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            // Make the bottom row responsive
+            Wrap(
+              spacing: 8.0,
+              runSpacing: 8.0,
+              alignment: WrapAlignment.spaceBetween,
               children: [
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.person, color: Colors.grey.shade600, size: 18),
+                    Icon(Icons.date_range, color: Colors.grey.shade600, size: 18),
                     const SizedBox(width: 6),
                     Text(
-                      course['instructor'],
+                      'Added: ${_formatDate(course['createdAt'])}',
                       style: TextStyle(
                         color: Colors.grey.shade700,
                       ),
@@ -404,11 +493,12 @@ class _EnrolledCoursesScreenState extends State<EnrolledCoursesScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.star, color: Colors.amber, size: 16),
                       const SizedBox(width: 4),
                       Text(
-                        '${course['credits']} Credits',
+                        '${course['creditHours'] ?? 0} Credits',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Colors.teal.shade800,
@@ -424,4 +514,50 @@ class _EnrolledCoursesScreenState extends State<EnrolledCoursesScreen> {
       ),
     );
   }
+  
+  // Helper method to format date
+  String _formatDate(String? dateString) {
+    if (dateString == null) return 'N/A';
+    try {
+      final date = DateTime.parse(dateString);
+      return '${date.day}/${date.month}/${date.year}';
+    } catch (e) {
+      return 'N/A';
+    }
+  }
 }
+
+// Add this method to your _EnrolledCoursesScreenState class
+  Widget _buildInfoItem(String label, String value) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.white.withOpacity(0.9),
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
